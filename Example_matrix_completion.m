@@ -12,11 +12,11 @@ gamma = 0.01;
 en = 0:1:n; en = en';
 
 %gamma = linspace(10^-5, 10^-1,500);
-tau = linspace(0.5,2.5,200);
+tau = linspace(0.5,2.5,2000);
 
 %%gamma = linspace(10^-5, 10^-1,50);%ok per lr
 %%tau = linspace(0.5,2.5,20); %ok per lr
-t = linspace(10,10^3,200);
+t = linspace(0.01,10,2000);
 
 m = zeros(length(tau),length(t));
 %keyboard 

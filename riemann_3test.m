@@ -112,13 +112,31 @@ function [Res, M] = riemann_3test(A,r)
 
     options.theta = 0.4;      % this is a parameter in trs_tCG_cached
     options.maxtime = 60; %30;     % stop if we take more than xyz seconds
-    options.tolgradnorm = 0;
-    options.tolcost = 1e-24; %1e-12;  % stop when f(X) is close to 0
+    options.tolgradnorm = 1e-10;
+    options.tolcost = 1e-20; %1e-12;  % stop when f(X) is close to 0
     
     %% Build an initial guess
     X0_USV.U = stiefelfactory(m, r).rand();
     X0_USV.V = stiefelfactory(n, r).rand();
     X0_USV.S = diag(rand(r, 1))/1000;
+
+    % Cross approximation: this works well for matrices
+    % J = randperm(n, 2*r); I = randperm(m, 2*r);
+    % [X0_USV.U, RU] = qr(A(:, J), 0);
+    % [X0_USV.V, RV] = qr(A(I, :)', 0);
+    % 
+    % Core = (RU / A(I,J)) * RV';
+    % [UU, SS, VV] = svd(Core);
+    % X0_USV.U = X0_USV.U * UU(:, 1:r);
+    % X0_USV.V = X0_USV.V * VV(:, 1:r);
+    % X0_USV.S = SS(1:r, 1:r);
+
+    J = randperm(n, r); I = randperm(m, r);
+    [X0_USV.U, ~] = qr(A(:, J), 0);
+    [X0_USV.V, ~] = qr(A(I, :)', 0);
+    X0_USV.S = diag(rand(r, 1))/1000;
+
+    keyboard;
 
     X0_LR = Rmn.to_LR(X0_USV);  % the same X0 in LR format
 
@@ -128,11 +146,12 @@ function [Res, M] = riemann_3test(A,r)
     upstairs = manoptlift(downstairs, lift);
     [X_LR, ~, LR_info] = trustregions(upstairs, X0_LR, options); %#ok<ASGLU>
    
-    keyboard
-    Res(1,1) = norm(M.*(X_LR.L*X_LR.R' - A), 'fro');
-    Res(1,2) = norm((X_LR.L*X_LR.R' - A), 'fro');
-    Res(1,3) = min(min(abs(X_LR.L*X_LR.R'- A)));
-    Res(1,4) = max(max(abs(X_LR.L*X_LR.R'- A)));
+    %keyboard
+    Res(1,1) = norm(M.*(X_LR.L*X_LR.R' - A), 'fro') / norm(A .* M, 'fro');
+    Res(1,2) = norm((X_LR.L*X_LR.R' - A), 'fro') / norm(A, 'fro');
+    Res(1,3) = min(min(abs(X_LR.L*X_LR.R'- A))) / max(max(A));
+    Res(1,4) = max(max(abs(X_LR.L*X_LR.R'- A)))/ max(max(A))
+    keyboard;
  
     %% Lift the downstairs problem through the desingularization
     desing.M = desingularizationfactory(m, n, r);
