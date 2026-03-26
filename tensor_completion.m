@@ -1,5 +1,9 @@
-function [Res, Xtrfull] = tensor_completion(A,core_dims)
+function [Res, Xtrfull] = tensor_completion(A,core_dims, choice, F, intervals)
 %function based on manopt low_rank_tensor_completion_embedded()
+
+
+%choice is a structure that contains the choice for the initial
+%approximation. It can be 'cheb', 'cross', 'tensor'
 
     if ~exist('tenrand', 'file')
         fprintf('Tensor Toolbox version 2.6 or higher is required.\n');
@@ -27,8 +31,16 @@ function [Res, Xtrfull] = tensor_completion(A,core_dims)
     % Generate a random mask P for observed entries:
     % P(i, j, k) = 1 if the entry (i, j, k) of A is observed,
     %            = 0 otherwise.
-    fraction = 0.1; % Fraction of observed entries.
-    nr = round(fraction * total_entries);
+    
+    %fraction = 0.1; % Fraction of observed entries.
+    %nr = round(fraction * total_entries);
+
+    nr = round(5*(sum(core_dims .* tensor_dims) + prod(core_dims)));
+%   nr = round(30* (sum(core_dims .* tensor_dims) + prod(core_dims)));
+%  %con 15 al posto di 30 non male + tucker_approx (2.4 per cento del totale)
+    fprintf('nr = %e, total entries = %d (%2.1f%% of known entries)\n', nr, total_entries, 100 * nr / total_entries)
+    pause
+
     ind = randperm(total_entries);
     ind = ind(1 : nr);
     P = false(tensor_dims);
@@ -82,67 +94,35 @@ function [Res, Xtrfull] = tensor_completion(A,core_dims)
     end
 
     %initial point -- general dimension d
-    Xt = starting_point(A,max(core_dims));
+    switch choice
+        case 'cross'
+            fprintf('INITIAL : cross approximation \n');
+            pause
+            Xt = cross_approx(A,max(core_dims));
+        case 'tucker'
+            fprintf('INITIAL : tucker approximation \n');
+            pause
+            Xt = tucker_approx(A,core_dims);
+        case 'cheb'
+            fprintf('INITIAL : Chebyshev approximation \n');
+            pause
+            [Xt, ~] = cheb_approx(core_dims, tensor_dims, F, intervals);
+        case 'fft'
+            fprintf('INITIAL : Chebyshev approximation via FFT \n');
+            pause
+            [Xt, ~] = cheb_approx_fft(core_dims, tensor_dims, F, intervals);
+    end
+
+   if isempty(Xt)
+       error('initial point not assigned')
+   end
+
     X0.X = Xt;
     Cpinv = cell(1, length(tensor_dims));
     for i = 1:length(tensor_dims)
        Cpinv{i} = pinv(double(tenmat(X0.X.core, i)));
     end
     X0.Cpinv = Cpinv;
-
-    
-%     n1 = tensor_dims(1);
-%     n2 = tensor_dims(2);
-%     n3 = tensor_dims(3);
-%     
-%     if any(core_dims > tensor_dims)
-%         fprintf('Check estimated rank.\n');
-%         return;
-%     end
-% 
-%     % r > 1?
-%     I1 = randperm(n1, r); I2 = randperm(n2, r); I3 = randperm(n3, r);
-%     U1 = zeros(n1,0); U2 = zeros(n2,0); U3 = zeros(n3,0);
-% 
-%     for i = 1 : r
-%         i1 = I1(i); i2 = I2(i); i3 = I3(i);
-%         
-%         % index 1
-%         u1 = A(:,i2,i3); u1 = u1(:);
-%         for j = 1 : i-1
-%             u1 = u1 - C(j) * U1(:,j) * U2(i2,j) * U3(i3,j);
-%         end
-%         u1 = u1 / u1(i1);
-%     
-%         % index 2
-%         u2 = A(i1,:,i3); u2 = u2(:);
-%         for j = 1 : i-1
-%             u2 = u2 - C(j) * U1(i1,j) * U2(:,j) * U3(i3,j);
-%         end
-%         u2 = u2 / u2(i2);
-%     
-%         % index 3
-%         u3 = A(i1,i2,:); u3 = u3(:);
-%         for j = 1 : i-1
-%             u3 = u3 - C(j) * U1(i1,j) * U2(i2,j) * U3(:,j);
-%         end
-%         C(i) = u3(i3);    
-%         u3 = u3 / u3(i3);
-%     
-%         U1 = [U1, u1]; U2 = [U2, u2]; U3 = [U3, u3];
-%     
-%         Core = zeros(i,i,i); for j = 1 : i; Core(j,j,j) = C(j); end
-%         Xt = ttensor(tensor(Core, [j j j]), {U1, U2, U3});
-%     end
-% 
-%     X0.X = Xt;
-%     Cpinv = cell(1, length(tensor_dims));
-%     for i = 1:length(tensor_dims)
-%        Cpinv{i} = pinv(double(tenmat(X0.X.core, i)));
-%     end
-%     X0.Cpinv = Cpinv;
-
-    
 
     % Options
     %X0 = problem.M.rand();
