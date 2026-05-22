@@ -35,7 +35,7 @@ end
 C = tensor(C);
 
 % --- Tucker decomposition ---
-TT = tucker_als(C, core_dims); %Problema "Input matrix is badly conditioned".
+TT = tucker_als(C, core_dims); %
 Core = TT.core;
 UU = TT.U;
 

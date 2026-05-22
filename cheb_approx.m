@@ -23,8 +23,9 @@ n_points = size(F); %array of dimensions of the evaluation tensor F
 
 for i = 1:d
     x = chebpts(n_points(i), intervals{i});
-%     Cx{i} = chebvander(x);
+%   Cx{i} = chebvander(x);
     Cx{i} = chebvander_shifted(x,intervals{i});
+    %keyboard
 end
 
 % Transform into the Chebyshev basis
@@ -35,7 +36,12 @@ for j = 1:d
 end
 
 % --- Tucker decomposition ---
-TT = tucker_als(C, core_dims); %Problema "Input matrix is badly conditioned".
+TT = tucker_als(C, core_dims); %
+
+% err_cheb = norm(full(TT) - tensor(C)) / norm(tensor(C));
+% fprintf('Relative error on C = %e\n', err_cheb);
+% pause
+
 Core = TT.core;
 UU = TT.U;
 
@@ -99,6 +105,7 @@ end
 apprT = ttensor(Core, UV);
 
 % Debug
+%keyboard
 % Confronto con funzione vera
 % XX_points = cell(1,d);
 % [XX_points{:}] = ndgrid(xx{:});
