@@ -18,7 +18,7 @@ end
 %avoid it, via cosine transform)
 Cx = cell(1,d);
 
-F = double(F);
+%F = double(F);
 n_points = size(F); %array of dimensions of the evaluation tensor F
 
 for i = 1:d
@@ -28,14 +28,41 @@ for i = 1:d
 end
 
 % Transform into the Chebyshev basis
-C = tensor(F);
+%C = tensor(F);
+C = F;
 for j = 1:d
    %keyboard
-   C = ttm(C, Cx{j} \ eye(size(Cx{j})), j);  % mode-j product %forse migliorabile
+   % C = ttm(C, Cx{j} \ eye(size(Cx{j})), j);  % mode-j product %forse migliorabile
+   C.U{j} = Cx{j} \ C.U{j};
+   %[C.U{j}, R] = qr(C.U{j}, 0);
+   %C.core = ttm(C.core, R, j);
 end
 
+for j = 1 : d
+    C.U{j} = [ C.U{j} ; zeros(tensor_dims(j) - size(C.U{j}, 1), size(C.U{j}, 2)) ];
+end
+
+n = size(C);
+for j = 1:d
+   %keyboard
+   % C = ttm(C, Cx{j} \ eye(size(Cx{j})), j);  % mode-j product %forse migliorabile
+   xx = chebpts(n(j), intervals{j});
+   Cx = chebvander_shifted(xx, intervals{j});
+   C.U{j} = Cx * C.U{j};
+   [C.U{j}, R] = qr(C.U{j}, 0);
+   C.core = ttm(C.core, R, j);
+end
+
+apprT = C;
+xx = false;
+
+%fC = double(C);
+%keyboard;
+
+return;
+
 % --- Tucker decomposition ---
-TT = tucker_als(C, core_dims); %
+%TT = tucker_als(C, core_dims); %
 
 % err_cheb = norm(full(TT) - tensor(C)) / norm(tensor(C));
 % fprintf('Relative error on C = %e\n', err_cheb);

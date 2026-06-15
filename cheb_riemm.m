@@ -1,10 +1,14 @@
-function [Res, Xtrfull] = cheb_riemm(core_dims, tensor_dims, n0, values, intervals, pi0, en, options, coefficient, F, fun)
+function [Res, Xtr] = cheb_riemm(core_dims, tensor_dims, n0, values, intervals, pi0, en, options, coefficient, base_level, F, fun)
     %two step optimization procedure, via chebyshev interpolation and
     %riemannian tensor completion, via tensor toolbox
 
     if ~exist('tenrand', 'file')
         fprintf('Tensor Toolbox version 2.6 or higher is required.\n');
         return;
+    end
+
+    if ~exist('base_level')
+        base_level = false;
     end
 
     %A is a multidimensional tensor in MATLAB
@@ -20,21 +24,27 @@ function [Res, Xtrfull] = cheb_riemm(core_dims, tensor_dims, n0, values, interva
 
 
 % numero target di osservazioni
-nr = round(coefficient* (sum(core_dims .* tensor_dims) + prod(core_dims)));
-fprintf('target nr = %e, total entries = %d (%2.1f%% of total)\n', ...
-    nr, total_entries, 100 * nr / total_entries);
 
+maxfibers = prod(tensor_dims(2:end));
 fiber_len = tensor_dims(1);
 % numero di fibre da prendere
-nfibers = ceil(nr / fiber_len);
-% numero massimo di fibre possibili
-maxfibers = prod(tensor_dims(2:end));
-nfibers = min(nfibers, maxfibers);
-
-fprintf('number of selected fibers = %d\n', nfibers);
-
-% scelgo fibre casuali
-fiber_ind = randperm(maxfibers, nfibers);
+if base_level
+    fiber_ind = 1 : maxfibers;
+    nfibers = maxfibers;
+else
+    nr = round(coefficient* (sum(core_dims .* tensor_dims) + prod(core_dims)));
+    fprintf('target nr = %e, total entries = %d (%2.1f%% of total)\n', ...
+        nr, total_entries, 100 * nr / total_entries);
+    nfibers = ceil(nr / fiber_len);
+    % numero massimo di fibre possibili
+    nfibers = min(nfibers, maxfibers);
+    
+    
+    fprintf('number of selected fibers = %d\n', nfibers);
+    
+    % scelgo fibre casuali
+    fiber_ind = randperm(maxfibers, nfibers);
+end
 
 P = false(tensor_dims);
 PA = zeros(tensor_dims);
@@ -76,6 +86,14 @@ end
     nobs = nnz(double(P));
     fprintf('effective observed entries = %d (%2.3f%% of total)\n', ...
         nobs, 100 * nobs / total_entries);
+
+    if base_level
+        UList = cell(1, d);
+        for j = 1 : d; UList{j} = eye(size(PA, j)); end
+        Xtr = ttensor(tensor(PA), UList{:});
+        Res = 0.0;
+        return
+    end
 
     %pause
     %Riemannian optimization problem
@@ -154,18 +172,21 @@ end
 %     options.tolgradnorm = 1e-5;
 
     % Minimize the cost function using Riemannian trust-regions
-%     Xtr = trustregions(problem, X0, options);
+    %Xtr = trustregions(problem, X0, options);
 
-    X0 = problem.M.rand();
+    % X0 = problem.M.rand();
 
-    Xtr = steepestdescent(problem, X0, options);
+    Xtr = conjugategradient(problem, X0, options);
+    % Xtr = X0;
+    Xtr = Xtr.X;
 
     % Display some quality metrics for the computed solution
-    Xtrfull = full(Xtr.X);
+    %Xtrfull = full(Xtr.X);
     %Afull = tensor(A);
     %fprintf('||X-A||_F / ||A||_F = %g\n', norm(Xtrfull - Afull)/norm(Afull));
-    fprintf('||PX-PA||_F / ||PA||_F = %g\n', norm(P.*Xtrfull - PA)/norm(PA));
+    %fprintf('||PX-PA||_F / ||PA||_F = %g\n', norm(P.*Xtrfull - PA)/norm(PA));
 
     %keyboard
-    Res = norm(P.*Xtrfull - PA)/norm(PA); %Relative residual on the mask
+    %Res = norm(P.*Xtrfull - PA)/norm(PA); %Relative residual on the mask
+    Res = 0.0;
 end

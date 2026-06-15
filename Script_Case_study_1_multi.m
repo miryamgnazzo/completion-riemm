@@ -1,5 +1,5 @@
 %Script CASE STUDY 1: choosing nr = 3 + multilevel
-clear all; close all; clc;
+% clear all; close all; clc;
 nreplicas = 2;
 mu1 = 0.5;
 mu2 = 0.5;
@@ -32,28 +32,35 @@ intervals{4} = [0.9, 0.99]; % cf
 core_dims = 4 * ones(1,nvariables);
 
 ncheb = [4 32]; % 64 128];
-coeff_levels = [1 10]; % 50];
+coeff_levels = [1 40]; % 50];
 
-options_levels(1).maxiter = 100;
-options_levels(1).maxinner = 50;
-% options_levels(1).tolcost = 1e-5;
-options_levels(1).tolgradnorm = 1e-5;
+for j = 1 : length(ncheb)
+    options_levels(j).maxiter = 10;
+    options_levels(j).maxinner = 50;
+    % options_levels(1).tolcost = 1e-5;
+    options_levels(j).tolgradnorm = 1e-8;
+    options_levels(j).minstepsize = 1e-15;        
+end
 
-options_levels(2).maxiter = 100;
-options_levels(2).maxinner = 50;
-% options_levels(2).tolcost = 1e-5;
-options_levels(2).tolgradnorm = 1e-6;
-
+% options_levels(1).maxiter = 100;
+% options_levels(1).maxinner = 50;
+% % options_levels(1).tolcost = 1e-5;
+% options_levels(1).tolgradnorm = 1e-5;
+% 
+% options_levels(2).maxiter = 100;
+% options_levels(2).maxinner = 50;
+% % options_levels(2).tolcost = 1e-5;
+% options_levels(2).tolgradnorm = 1e-6;
+% 
 % options_levels(3).maxiter = 100;
 % options_levels(3).maxinner = 50;
 % % options_levels(3).tolcost = 1e-6;
 % options_levels(3).tolgradnorm = 1e-6;
-
+% 
 % options_levels(4).maxiter = 100;
 % options_levels(4).maxinner = 50;
-% options_levels(4).tolcost = 1e-6;
-
-% options_levels(4).tolgradnorm = 1e-6;
+% %options_levels(4).tolcost = 1e-6;
+% options_levels(4).tolgradnorm = 1e-8;
 
 [Res, Xfinal, err, relerr] = cheb_completion_multi( ...
     core_dims, ncheb, intervals, pi0, en, ...
