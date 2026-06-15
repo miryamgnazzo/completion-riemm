@@ -15,8 +15,14 @@ function v = fiber_time(tvec, param, pi0, en, fun)
 
     % Generatore fissato ai parametri selezionati
     % (con param che deve essere cell-array)
-    nQ = length(pi0)-1;
-    Q = evalQ(nQ, param{:});
+    
+    %Simpler CASE
+    %nQ = length(pi0)-1;
+    %Q = evalQ(nQ, param{:});
+
+    %Extended CASE
+    nQ = length(pi0) -2;
+    Q = evalQ_extended(nQ, param{:}); %da migliorare
 
     tvec = tvec(:);
     nt = length(tvec);
@@ -26,9 +32,10 @@ function v = fiber_time(tvec, param, pi0, en, fun)
 
 %OPTION 1:  choose the exponential
 % 
-    for k = 1 : nt
-        v(k) = en'*expmv(tvec(k), Q, pi0);
-    end
+% fprintf('ci arrivo? \n')
+%     for k = 1 : nt
+%         v(k) = en'*expmv(tvec(k), Q, pi0);
+%     end
 
 %OPTION 2: KolmogorovODE 
 
@@ -39,6 +46,12 @@ function v = fiber_time(tvec, param, pi0, en, fun)
 %     v(k) = en'*W;
 % end
 
+
+%QUESTO prova 11-06
+% fprintf('ci arrivo?\n')
+         W = KolmogorovODE(Q, pi0, tvec);
+         v = en'*W';
+         v = v(:); 
 
 %QUESTO OK!
 %          W = KolmogorovIntegralODE(tvec, Q, pi0);

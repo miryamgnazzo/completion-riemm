@@ -28,7 +28,9 @@ for k = 1:length(all_ind)
         param{j-1} = values{j}(idx{j});
     end
 
-    v = fiber_time(tvec, param, pi0, en);
+    v = fiber_time(tvec, param, pi0, en); %11-06
+%    v = fiber_time_fast(tvec, param, pi0, en); %
+
     A(idx{:}) = v;
 end
 

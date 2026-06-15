@@ -25,7 +25,6 @@ for i = 1:d
     x = chebpts(n_points(i), intervals{i});
 %   Cx{i} = chebvander(x);
     Cx{i} = chebvander_shifted(x,intervals{i});
-    %keyboard
 end
 
 % Transform into the Chebyshev basis

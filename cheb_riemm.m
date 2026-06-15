@@ -61,7 +61,9 @@ for k = 1:nfibers
         param{j-1} = values{j}(idx{j});
     end
 
-    v = fiber_time(values{1}, param, pi0, en);
+   v = fiber_time(values{1}, param, pi0, en); %11-06
+%    v = fiber_time_fast(values{1}, param, pi0, en); %11-06
+
     PA(idx{:}) = v;
     P(idx{:}) = true;
 end
@@ -75,7 +77,7 @@ end
     fprintf('effective observed entries = %d (%2.3f%% of total)\n', ...
         nobs, 100 * nobs / total_entries);
 
-    pause
+    %pause
     %Riemannian optimization problem
 
     % Pick the submanifold of tensors of size n1-by-...-by-nd of
@@ -120,13 +122,14 @@ end
             values_start{i} = chebpts(n0, intervals{i});
         end
         fprintf('F not provided, computing it ...\n');
-        pause
+        %pause
         F = eval_all(values_start, pi0, en); %full small tensor
     else
         fprintf('F already provided!\n');
-        pause
+        %pause
     end
 
+    fprintf('Looking for chebyshev approx!\n');
     [Xt, ~] = cheb_approx(core_dims, tensor_dims, F, intervals);
     
     if isempty(Xt)
@@ -151,7 +154,11 @@ end
 %     options.tolgradnorm = 1e-5;
 
     % Minimize the cost function using Riemannian trust-regions
-    Xtr = trustregions(problem, X0, options);
+%     Xtr = trustregions(problem, X0, options);
+
+    X0 = problem.M.rand();
+
+    Xtr = steepestdescent(problem, X0, options);
 
     % Display some quality metrics for the computed solution
     Xtrfull = full(Xtr.X);
