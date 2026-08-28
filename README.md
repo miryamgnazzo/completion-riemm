@@ -28,10 +28,10 @@ experiments/      one folder per experiment, with its .mat results
 
 ## Experiments
 
-| | Section of the paper | Setting | Runs | Time |
-|---|---|---|---|---|
-| **EX1** | Comparison with ACA | Case 1, reliability, `d = 3,4,5` | 50 seeds | ~1 h |
-| **EX1-under** | Comparison with ACA | Case 1, under repair, `d = 6` | 50 seeds | ~4 h |
-| **EX2** | Increasing dimensionality | Case 1, reliability, `d = 6..9` | 1 | ~10 min |
-| **EX3** | Scalability in state-space size | Case 2 (IPS), reliability, `d = 5,6,7` × `ne = 20,30,40` | 50 seeds | ~10 h |
-| **EX3-under** | Scalability in state-space size | Case 2 (IPS), under repair, `d = 5` | 1 | ~5 min per `ne` |
+| | Section of the paper | Setting |
+|---|---|---|
+| **EX1** | Comparison with ACA | Case 1, reliability, `d = 3,4,5` | 
+| **EX1-under** | Comparison with ACA | Case 1, under repair, `d = 6` | 
+| **EX2** | Increasing dimensionality | Case 1, reliability, `d = 6..9` | 
+| **EX3** | Scalability in state-space size | Case 2 (IPS), reliability, `d = 5,6,7` × `ne = 20,30,40` | 
+| **EX3-under** | Scalability in state-space size | Case 2 (IPS), under repair, `d = 5` | 
