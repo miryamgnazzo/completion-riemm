@@ -12,9 +12,9 @@ here = fileparts(mfilename('fullpath'));
 %  (gli script vivono in <repo>/experiments/<esperimento>/).
 repoRoot = fileparts(fileparts(here));
 run(fullfile(repoRoot, 'setup_paths.m'));
-if ~exist('chebpts','file'),      error('Serve Chebfun sul path.'); end
-if ~exist('tenrand','file'),      error('Serve Tensor Toolbox (>= 2.6) sul path.'); end
-if ~exist('trustregions','file'), error('Serve Manopt sul path.'); end
+if ~exist('chebpts','file'),      error('chebpts not found: add MarkovCrossApproximation to the path.'); end
+if ~exist('tenrand','file'),      error('Tensor Toolbox (>= 2.6) is required on the path.'); end
+if ~exist('trustregions','file'), error('Manopt is required on the path.'); end
 
 if nargin < 1, cfg = struct(); end
 g = @(f,v) getdef(cfg,f,v);
