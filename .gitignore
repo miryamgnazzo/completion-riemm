@@ -1,0 +1,18 @@
+# log di MATLAB lanciato in batch / staccato
+stdout*.txt
+stderr*.txt
+*PID*.txt
+
+# file temporanei dell'editor MATLAB
+*.asv
+*.m~
+slprj/
+
+# roba di sistema
+.DS_Store
+Thumbs.db
+
+# log e figure rigenerati a ogni run degli esperimenti
+*progress.txt
+*.png
+*.tex
