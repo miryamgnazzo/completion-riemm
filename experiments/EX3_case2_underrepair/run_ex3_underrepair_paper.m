@@ -1,7 +1,7 @@
 function run_ex3_underrepair_paper(cfg)
 %RUN_EX3_UNDERREPAIR_PAPER  Driver for Case study 2 under repair.
-%   Runs ne = 20, 30, 40 in the published setting: d = 5, core [16 4 4 4 4],
-%   the reliability parameter order and the remaining parameters frozen at
+%   Runs ne = 20, 30, 40 in the setting: d = 5, core [16 4 4 4 4],
+%   the reliability parameter order and the remaining parameters fixed at
 %   the lower bound.
 %
 %   run_ex3_underrepair_paper
