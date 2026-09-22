@@ -13,8 +13,7 @@ function [vals, valsXt, err, relerr] = check_samples(Xt, values, nsamples, pi0, 
 
     for k = 1:ns
         if is_tt
-            % ttensor entry = core contracted with the factor rows
-            % (nessun tensore pieno costruito)
+            % ttensor entry 
             cols = cell(1, dd);
             for m = 1:dd
                 cols{m} = Xt.U{m}(subs(k, m), :).';
