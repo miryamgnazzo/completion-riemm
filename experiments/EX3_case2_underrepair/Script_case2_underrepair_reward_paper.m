@@ -14,15 +14,14 @@ if nargin < 1, cfg = struct(); end
 g = @(f,v) getdef(cfg,f,v);
 
 here = fileparts(mfilename('fullpath'));
-% Le funzioni condivise stanno in <repo>/src, messe sul path da setup_paths.m
-%  (gli script vivono in <repo>/experiments/<esperimento>/).
+%
 repoRoot = fileparts(fileparts(here));
 run(fullfile(repoRoot, 'setup_paths.m'));
 if ~exist('chebpts','file'),      error('chebpts not found: add MarkovCrossApproximation to the path.'); end
 if ~exist('tenrand','file'),      error('Tensor Toolbox is required on the path.'); end
 if ~exist('trustregions','file'), error('Manopt is required on the path.'); end
 
-%% ---- config --------------------------------------------------------------
+%% ---- config
 ne           = g('ne', 30);
 d            = g('d', 5);
 ncheb        = g('ncheb', [16 16]);        % base = core, poi livello finale sparso
@@ -32,9 +31,9 @@ nsamples     = g('nsamples', 2000);
 aca_tol      = g('aca_tol', 1e-6);
 sample_seed  = g('sample_seed', 0);
 run_seed     = g('run_seed', 1);
-max_frac     = g('max_frac', 0.50);        % soglia di onesta' sul TOTALE
+max_frac     = g('max_frac', 0.50);        % fraction on total
 do_aca       = g('do_aca', true);
-resume       = g('resume', true);          % riprende da outfile se compatibile
+resume       = g('resume', true);          % 
 
 maxiter      = g('maxiter', 120);
 maxinner     = g('maxinner', 50);
@@ -50,16 +49,16 @@ if numel(coeff_levels) ~= numel(ncheb)
     error('coeff_levels must have the same length as ncheb');
 end
 
-% 'a' e non 'w': con resume attivo il log della sessione precedente va tenuto
+% 
 if resume && isfile(outfile), lmode = 'a'; else, lmode = 'w'; end
 fid=fopen(logfile,lmode); fprintf(fid,'start %s\n', datestr(now)); fclose(fid);
 
-%% ---- Modello IPS ---------------------------------------------------------
+%% ---- Modello IPS 
 nstates = 3 + 2*ne;
 tf      = 24*365*10;                       % 10 anni
 pi0 = zeros(nstates,1); pi0(1) = 1;
 
-% REWARD DEL PAPER: una sola unita' operativa, con G Up oppure Down
+% REWARD
 en = zeros(nstates,1);
 en(2)           = 1;                       % (Up,1)
 en(2+ne+(1:ne)) = 1;                       % (Down,1), tutte le fasi di Erlang
@@ -68,16 +67,8 @@ iv = { [1,3], [1e-4,1e-3], [1e-5,1e-4], [1e-5,1e-4], [1e-6,1e-5], [0.5,2.5], ...
        [0.25,0.75], [1e-6,1e-5], [1e-7,1e-5], [1e-6,1e-5], [1e-6,1e-5], [1e-7,1e-6] };
 mid = cellfun(@(x) 0.5*(x(1)+x(2)), iv);
 
-% ---- selezione dei parametri liberi ---------------------------------------
-% par_order elenca gli indici di iv nell'ordine di attivazione: i primi p = d-1
-% sono LIBERI (e diventano, in quest'ordine, le dimensioni 2..d del tensore),
-% il resto e' fissato. Gli indici di iv corrispondono a par_2..par_13.
-%   default            = [1 2 6 7 ...]  -> L, lambda, mu, mu_u   (under-repair)
-%   ordine reliability = [3 4 5 7 8 9 10 11 12 6 1 2] -> lambda_r, lambda_b,
-%                        lambda_c, mu_u, ...           ("deboli prima")
-% fix_at sceglie dove bloccare i parametri non attivi:
-%   'mid'   punto medio dell'intervallo  (convenzione degli script under-repair)
-%   'lower' bordo inferiore              (convenzione degli script reliability)
+% ---- parameters--
+%
 par_order = g('par_order', [1 2 6 7 3 4 5 8 9 10 11 12]);
 fix_at    = g('fix_at', 'mid');
 
@@ -105,7 +96,7 @@ appendlog(logfile, sprintf(['IPS ne=%d nstates=%d d=%d PHYSICAL TIME | reward: %
     'rewarded states out of %d (one operational unit) | s0=%.3e'], ...
     ne, nstates, d, nnz(en), nstates, s0));
 
-%% ---- onesta' del completamento: entrate osservate / tensore finale --------
+%% -- fraction = entrate osservate / tensore finale --------
 tot_final = N^d;
 appendlog(logfile, sprintf('final tensor: %d^%d = %.3e entries', N, d, tot_final));
 keep = true(1, numel(core_list));
@@ -131,7 +122,7 @@ end
 core_list = core_list(keep);  obs_tot = obs_tot(keep);
 if isempty(core_list), error('no honest configuration with these parameters'); end
 
-%% ---- griglia finale + test set esatto ------------------------------------
+%% ---- grid
 grd = cell(1,d); for i=1:d, grd{i}=chebpts(N,intervals{i}); end
 rng(sample_seed);
 subs = zeros(nsamples,d); for j=1:d, subs(:,j)=randi(N,nsamples,1); end
@@ -145,7 +136,7 @@ nvt = norm(vt);
 appendlog(logfile, sprintf('test set esatto su %d punti: %.0f s (nvt=%.3e)', ...
     nsamples, toc(t0), nvt));
 
-%% ---- ACA on-demand (riferimento) -----------------------------------------
+%% ---- ACA
 kACA = NaN; err_aca_full = NaN; time_aca = NaN; obs_aca = NaN;
 aca_nft = 0;                       % condiviso con la nested fib_od_counted
 nc = numel(core_list);
@@ -153,10 +144,7 @@ res = nan(nc, 6);                  % [r_tempo r_par err tempo_s obs_tot frac_pct
 done_core = false(1, nc);
 aca_done  = false;
 
-% ---- RESUME: ACA e le configurazioni gia' fatte non vengono ricalcolate ----
-% Serve perche' un run lungo puo' essere interrotto (in un caso Windows ha
-% ucciso MATLAB come "applicazione bloccata" dopo 11 minuti di ACA, facendo
-% perdere tutto: ACA girava per prima e veniva salvata solo dentro lo sweep).
+% ---- restart
 if resume && isfile(outfile)
     S = load(outfile);
     okcfg = S.ne == ne && S.d == d && S.N == N && S.nsamples == nsamples && ...
@@ -190,7 +178,7 @@ if do_aca && ~aca_done
         repmat('  <-- CAP maxit=1000: NOT converged', 1, kACA>=1000)));
 end
 
-%% ---- sweep sul rango parametrico -----------------------------------------
+%% ---- rank
 for ci = 1:nc
     if done_core(ci)
         appendlog(logfile, sprintf('core=[%s] gia'' fatto (err=%.3e, %.0f s), salto', ...
@@ -219,7 +207,7 @@ for ci = 1:nc
 end
 appendlog(logfile, 'DONE');
 
-%% ===== nested: salvataggio (condivide tutto lo scope) =====================
+%% =====  saving 
     function save_partial()
         save(outfile, 'res','core_list','ncheb','coeff_levels','kACA','err_aca_full', ...
              'time_aca','obs_aca','s0','ne','nstates','d','N','intervals','en', ...
@@ -227,7 +215,7 @@ appendlog(logfile, 'DONE');
              'done_core','aca_done','obs_tot','par_order','fix_at');
     end
 
-%% ===== nested: oracolo delle fibre per ACA, con contatore ==================
+%% ===== fibers
     function f = fib_od_counted(j, i)
         prm = cell(1, d-1);
         for m = 2:d, prm{m-1} = grd{m}(i(m)); end
@@ -245,7 +233,7 @@ appendlog(logfile, 'DONE');
     end
 end
 
-%% ===== locali =============================================================
+%% ===== local functions
 function v = getdef(cfg,f,default), if isfield(cfg,f), v=cfg.(f); else, v=default; end, end
 
 function tf = isAbsPath(p)
@@ -257,8 +245,7 @@ function appendlog(f,msg)
     fprintf('%s\n', msg);
 end
 
-% Entrate del tensore osservate dalla pipeline multilivello, per livello e in
-% totale. Replica la logica di cheb_riemm_sparse_mixed (righe ~52-70).
+% entries tensor
 function [tot, per_lev] = observed_entries(core_dims, ncheb, coeff_levels, d)
     per_lev = zeros(1, numel(ncheb));
     per_lev(1) = prod(core_dims);                     % livello base: griglia piena
