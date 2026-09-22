@@ -1,14 +1,7 @@
 function [Res, Xtr, X0_out, rg0_out, norm_rg0_out] = cheb_riemm_sparse_mixed(core_dims, tensor_dims, n0, values, intervals, pi0, en, options, coefficient, base_level, F, fun, Qh)
-% [MIXED-RANK] Copia di cheb_riemm_sparse con UN'UNICA differenza sostanziale:
+% [MIXED-RANK] Copia di cheb_riemm_sparse con :
 % la varieta' e' costruita con il rango multilineare PER-MODO core_dims
-% (invece di r = max(core_dims) uguale su tutti i modi). In questo modo si
-% puo' usare un rango ALTO nel tempo (modo 1) e BASSO nei parametri:
-% le matrici KRU nel costo/gradiente/Hessiano ESCLUDONO il modo 1, quindi
-% il fattore critico r^(d-1) dipende solo dai ranghi dei parametri.
-% Tutto il resto del file e' identico all'originale (che non viene toccato),
-% tranne la [CACHE per punto X]: costo/gradiente/Hessiano condividono via
-% store di Manopt le righe dei fattori, KRU e i residui, evitando di
-% ricostruire la matrice grande a ogni chiamata nello stesso punto.
+% (invece di r = max(core_dims) uguale su tutti i modi). 
 %
 % Richiede che il punto iniziale abbia rango core_dims: al livello base la
 % griglia deve avere tensor_dims == core_dims (es. [5, 2, 2, ..., 2]).
@@ -19,10 +12,10 @@ if ~exist('Qh', 'var'), Qh = []; end
 %ATTENZIONE: funziona bene solo sulle fibre, è scritta proprio per questa
 %applicazione
 
-% output opzionali (assegnati di default per non rompere il ramo base_level)
+%
 X0_out = []; rg0_out = []; norm_rg0_out = [];
 
-% handle opzionale della misura (fun assente/vuoto => instantaneous)
+% default istantaneo
 if ~exist('fun', 'var'), fun = []; end
 
     %two step optimization procedure, via chebyshev interpolation and
@@ -67,14 +60,7 @@ else
 
     fprintf('number of selected fibers = %d\n', nfibers);
 
-    % scelgo fibre casuali. Con maxfibers = prod(n_k) enorme (d grande, N
-    % grande) l'indice lineare supera 2^53 (limite di randperm e soglia di
-    % rappresentabilita' esatta dei double), quindi randperm/ind2sub non sono
-    % utilizzabili. In quel caso campiono i multi-indici DIRETTAMENTE (un
-    % indice casuale per ciascun modo); con nfibers << maxfibers le fibre sono
-    % quasi certamente distinte. Sotto la soglia resta il comportamento
-    % originale (randperm), cosi' i risultati degli altri esperimenti non
-    % cambiano.
+    % scelgo fibre casuali
     if maxfibers < 2^53
         fiber_ind = randperm(maxfibers, nfibers);
         [subs{:}] = ind2sub(tensor_dims(2:end), fiber_ind);
@@ -112,7 +98,7 @@ for k = 1:nfibers
 
 end
 
-% valori osservati come matrice n1 x nfibers (usata dalle versioni vettorizzate)
+% valori osservati come matrice n1 x nfibers 
 FVmat = [fiber_vals{:}];
 
     nobs = nfibers * tensor_dims(1);
@@ -132,38 +118,17 @@ FVmat = [fiber_vals{:}];
 
     % Pick the submanifold of tensors of size n1-by-...-by-nd of
     % multilinear rank (r1, ..., rd).
-    % [MIXED-RANK] rango per-modo: qui sta l'unica differenza rispetto a
-    % cheb_riemm_sparse (che usa r = max(core_dims) uguale su tutti i modi).
     problem.M = fixedranktensorembeddedfactory(tensor_dims, core_dims);
 
-    % --- Override di M.transp (trasporto vettoriale) -----------------------
-    % La versione del factory passa per il tensore ambiente PIENO
-    % (ttm(ttm(G,U),U_tilde,'t') costruisce un n1 x ... x nd denso) e per d
-    % grande esaurisce la memoria. Matematicamente pero' il trasporto usa
-    % solo le matrici piccole A{j} = U_tilde{j}'*U{j} e B{j} = U_tilde{j}'*V{j}:
-    % transport_small (in fondo al file) fa le stesse operazioni con sole
-    % contrazioni piccole ed e' identico in aritmetica esatta.
+    % --- new version M.transp 
     problem.M.transp = @transport_small;
 
-    % --- Override di M.inner / M.norm (metrica STABILE) --------------------
-    % Il factory calcola i termini della metrica come
-    %     innerprod(C, ttm(C, V'*W, i))  =  trace((V'*W) * C_i*C_i')
-    % contraendo la Gram del core (entrate ~ ||C||^2, enormi per d grande)
-    % con la matrice piccola V'*W: pavimento di errore assoluto
-    % ~ eps*||C||^2, che sommerge curvature/gradienti piccoli (il tCG vede
-    % "curvature negative" spurie e i passi vengono rigettati).
-    % Forma equivalente ma stabile: contrarre PRIMA il core con V,
-    %     <C x_i V, C x_i W> = <V*C_i, W*C_i>,
-    % cosi' l'errore e' proporzionale alle quantita' vere (~eps*||VC||*||WC||).
+    % --- new M.inner / M.norm (metrica STABILE)
     problem.M.inner = @inner_stable;
     problem.M.norm  = @(X, eta) sqrt(max(inner_stable(X, eta, eta), 0));
 
 
-    % [CACHE per punto X] costo, gradiente e Hessiano condividono tramite lo
-    % store di Manopt le quantita' che dipendono SOLO dal punto: righe dei
-    % fattori sulle fibre (Mu_rows), il loro Khatri-Rao (KRU, la matrice
-    % grande) e i residui R. Cosi' dentro una stessa iterazione del
-    % trust-region KRU viene costruita UNA volta invece che a ogni chiamata.
+    % [CACHE per punto X] da passare
     function store = prep_kru(XX, store)
         if ~isfield(store, 'KRU')
             U = XX.X.U;  s = ndims(XX.X.core);
@@ -206,15 +171,9 @@ problem.grad = @grad;
 
 % Scelta dell'Hessiano riemanniano (options.hessian):
 %   'exact' (default) : ehess2rhess del factory con ambiente sptensor.
-%                       Esatto, ma la proiezione dell'ambiente sparso
-%                       densifica un unfolding n^(d-1) x r: NON scala per
-%                       d grande (out of memory gia' con d = 9, n = 16).
+%                       
 %   'gn'              : Gauss-Newton proiettato, Proj_X(P(eta)), calcolato
-%                       interamente sulle fibre riusando rgrad (che E'
-%                       la proiezione tangente di un ambiente supportato
-%                       sulle fibre). Trascura solo il termine di curvatura
-%                       (lineare nel residuo): simmetrico e semidefinito
-%                       positivo, adatto a trustregions in ogni dimensione.
+%                       interamente sulle fibre riusando rgrad 
 if isfield(options, 'hessian') && ~isempty(options.hessian)
     hessian_kind = lower(options.hessian);
 else
@@ -249,12 +208,6 @@ function E_struct = E_fibers(XX)
 end
 
 % gradiente riemanniano direttamente senza egrad - VETTORIZZATO sulle fibre.
-% E' la proiezione tangente del tensore ambiente supportato sulle fibre
-% osservate, con valori E_struct.R (n1 x nfibers): vale sia per il gradiente
-% (R = residui) sia per l'Hessiano di Gauss-Newton (R = P(eta) sulle fibre).
-% Mu_rows/KRU opzionali: blocchi riga dei fattori (ordine di modo
-% decrescente s,...,2, come in cost/E_fibers) e loro prodotto di Khatri-Rao
-% per riga, riusabili fra piu' chiamate nello stesso punto X.
 function rg = rgrad(XX, E_struct, Mu_rows, KRU)
 
     X  = XX.X;
@@ -286,9 +239,7 @@ function rg = rgrad(XX, E_struct, Mu_rows, KRU)
     % modo 1: dV{1} = sum_l r_l * (KRU(l,:) * Cpinv{1})
     dV{1} = R * (KRU * XX.Cpinv{1});         % n1 x r1
 
-    % modi k >= 2: il kron esclude il modo k e include (U1'*r_l) come
-    % blocco piu' interno (modo 1, il piu' veloce), coerente con
-    % l'ordinamento delle colonne di tenmat(C,k) usato in Cpinv{k}
+    % modi k >= 2
     P1t = P1.';                              % nf x r1
     for kk = 2:s
         blocks = cell(1, s-1);
@@ -315,13 +266,8 @@ end
 
 
 %% ===== HESSIANO ============================================================
-% Tutto strutturato sulle fibre: nessun tensore pieno viene mai costruito.
-% L'ambient (egrad euclideo e P(eta)) e' un sptensor supportato solo sulle
-% fibre osservate; le proiezioni e il termine di curvatura sono delegati al
-% factory tramite ehess2rhess (la varieta' e' curva: la curvatura NON e' nulla).
-
-% Gradiente euclideo come tensore ambient SPARSO (solo fibre osservate):
-%   E = P(X) - b ,  con b = fiber_vals.
+% Tutto strutturato sulle fibre
+% Gradiente euclideo come tensore ambient SPARSO (solo fibre osservate)
 function E = egrad_sparse(XX)
     Es = E_fibers(XX);                       % R: n1 x nf residui sulle fibre
     E  = fiber_sptensor(Es.R);               % sptensor supportato sulle fibre
@@ -336,9 +282,6 @@ function H = ehess_sparse(XX, eta)
 end
 
 % Valori di P(eta) sulle fibre osservate (matrice n1 x nfibers).
-% Au/KRU opzionali: righe dei fattori e loro Khatri-Rao, riusabili fra
-% chiamate nello stesso punto X (le righe di V dipendono da eta e vengono
-% sempre ricostruite).
 function Hfib = ehess_fib(XX, eta, Au, KRU)
     X = XX.X;  U = X.U;  C = X.core;  s = ndims(C);
     G = eta.G;  V = eta.V;
@@ -376,11 +319,7 @@ function Hfib = ehess_fib(XX, eta, Au, KRU)
 end
 
 % Hessiano riemanniano di GAUSS-NEWTON: Hrh = Proj_X(P(eta)), tutto sulle
-% fibre. rgrad(XX, E_struct) calcola esattamente la proiezione tangente di
-% un tensore ambiente supportato sulle fibre osservate (con i valori in
-% E_struct.R), quindi basta passargli i valori di P(eta).
-% Il termine di curvatura (Weingarten), lineare nel residuo, e' trascurato:
-% l'operatore resta simmetrico e semidefinito positivo.
+% fibre
 function [Hrh, store] = hess_gn(XX, eta, store)
     if nargin < 3, store = struct(); end
     % [CACHE] riusa Mu_rows/KRU del punto (condivisi con costo e gradiente)
@@ -389,9 +328,7 @@ function [Hrh, store] = hess_gn(XX, eta, store)
     Hrh  = rgrad(XX, Hs, store.Mu_rows, store.KRU);
 end
 
-% Hessiano riemanniano = Proj_X(ehess[eta]) + curvatura(egrad,eta).
-% Il termine di curvatura (Weingarten) e' gestito dal factory: gli passiamo
-% egrad ed ehess come ambient sparsi e otteniamo direttamente rhess.
+% Hessiano riemanniano = Proj_X(ehess[eta]) + curvatura(egrad,eta), Weingarten nella factory
 function [Hrh, store] = hess(XX, eta, store)
     if nargin < 3 || ~isfield(store, 'Eamb')
         store.Eamb = egrad_sparse(XX);        % egrad sparso, una volta per punto
@@ -400,13 +337,8 @@ function [Hrh, store] = hess(XX, eta, store)
     Hrh = problem.M.ehess2rhess(XX, store.Eamb, Heh, eta);
 end
 
-%% --- Helper vettorizzati (niente ttv nei cicli sulle fibre) ----------------
+%% --- help function
 
-% Prodotto di Khatri-Rao "riga-per-riga": date le matrici M{1},...,M{m}
-% (ognuna nf x r_t), restituisce K (nf x prod(r_t)) con
-%   K(l,:) = kron( M{1}(l,:), M{2}(l,:), ..., M{m}(l,:) ).
-% M{1} e' il blocco piu' esterno (lento), M{end} il piu' interno (veloce):
-% coerente con la matricizzazione modo-1 reshape(core, r1, []).
 function K = rowkron(M)
     K = M{1};
     for t = 2:numel(M)
@@ -419,8 +351,7 @@ function K = rowkron(M)
     end
 end
 
-% Costruisce un sptensor supportato sulle fibre osservate, dati i valori
-% Vfib (n1 x nfibers): colonna l = valori lungo il modo 1 della fibra l.
+% Costruisce un sptensor supportato sulle fibre osservate
 function S = fiber_sptensor(Vfib)
     n1 = tensor_dims(1);
     col1 = repmat((1:n1)', nfibers, 1);            % indice di modo 1
@@ -428,9 +359,7 @@ function S = fiber_sptensor(Vfib)
     S = sptensor([col1, rest], Vfib(:), tensor_dims);
 end
 
-% Prodotto interno sullo spazio tangente: identico in aritmetica esatta a
-% M.inner del factory, ma calcolato nella forma stabile <V*C_i, W*C_i>
-% (vedi commento all'override sopra).
+% Prodotto interno sullo spazio tangente
 function ip = inner_stable(X, eta, zeta)
     C = X.X.core;
     s = ndims(C);
@@ -443,11 +372,8 @@ function ip = inner_stable(X, eta, zeta)
     end
 end
 
-% Trasporto vettoriale da X a Y: stessa matematica di M.transp del factory
-% (proiezione ortogonale, Kressner et al.), ma senza mai costruire il
-% tensore ambiente pieno. Servono solo le matrici piccole
-%   A{j} = U_tilde{j}'*U{j},  B{j} = U_tilde{j}'*V{j}   (r x r)
-% e contrazioni del core (dimensione massima r^(d-1) x n_i).
+% Trasporto vettoriale da X a Y: stessa matematica di M.transp del factory ma senza mai costruire il
+% tensore ambiente pieno
 function eta_t = transport_small(X, Y, xi)
     C  = X.X.core;   U  = X.X.U;   Ut = Y.X.U;
     G  = xi.G;       V  = xi.V;
@@ -490,15 +416,7 @@ function eta_t = transport_small(X, Y, xi)
 end
 
 
-%% ===== SELFTEST brute-force (casi piccoli) ================================
-% Verifica l'implementazione REALE (le stesse funzioni annidate usate
-% dall'ottimizzatore) contro riferimenti indipendenti:
-%   1) costo   vs 0.5*||P_Omega(full(X0)) - P_Omega(A)||^2 sul tensore pieno
-%   2) rgrad   vs proiezione tangente del factory (egrad2rgrad/proj)
-%              dell'ambiente denso dei residui
-%   3) hess_gn vs Proj( maschera_Omega( tangent2ambient(eta) ) ) di riferimento
-%   4) simmetria e semidefinitezza positiva dell'operatore GN
-%   5) coerenza della cache (store condiviso vs store nuovi)
+%%test for degub, not needed
 function selftest_impl(X0)
     fprintf('\n--- SELFTEST implementation (brute force on the full tensor) ---\n');
     M_ = problem.M;
@@ -557,12 +475,7 @@ function selftest_impl(X0)
     fprintf('5) cache:    |costo(store cond.) - costo| = %.3e | ||grad(fresh)-grad(cond.)|| = %.3e\n', ...
         abs(f_shared - f_impl), dgc);
 
-    % 6) TEST DECISIVO sulla tecnica Khatri-Rao dell'Hessiano: con RESIDUO
-    % NULLO (dati = valori esatti di X0 sulle fibre) X0 e' un punto critico
-    % esatto e l'Hessiano GN coincide con l'Hessiano VERO del costo: il
-    % test di Taylor di Manopt deve dare slope ~3 (valido anche con
-    % retrazione del 1o ordine, perche' il punto e' critico). Se la
-    % costruzione via Khatri-Rao fosse sbagliata, lo slope 3 non uscirebbe.
+    % 6) check kathri rao
     FVmat_orig = FVmat;
     GXfib = zeros(tensor_dims(1), nfibers);
     for l = 1:nfibers
@@ -576,9 +489,7 @@ function selftest_impl(X0)
         problem.M.norm(X0, g0));
     checkhessian(problem, X0); drawnow;
 
-    % 7) GN vs ''exact'' (ehess2rhess con termine di Weingarten): la
-    % differenza dei due Hessiani e' il termine di curvatura, LINEARE nel
-    % residuo: scalando il residuo di 100 deve scalare di ~100.
+    % 7) GN vs ''exact''
     rng(3);
     Rdir = randn(size(FVmat));
     dHs = zeros(1, 2); ss = [1e-1, 1e-3];
@@ -630,11 +541,7 @@ end
     % Options
     %X0 = problem.M.rand();
 
-    % --- SELFTEST brute-force (solo casi piccoli) ---------------------------
-    % Attivalo con options.selftest = true: confronta costo, gradiente e
-    % Hessiano GN dell'implementazione (con cache e ranghi misti) contro
-    % riferimenti INDIPENDENTI calcolati sul tensore pieno con le proiezioni
-    % del factory di Manopt. Tutto al punto X0.
+    % test to check
     if isfield(options, 'selftest') && options.selftest
         if total_entries > 1e6
             warning('selftest skipped: tensor too large (%d entries).', total_entries);
@@ -643,9 +550,7 @@ end
         end
     end
 
-    % --- Validazione opzionale di gradiente e Hessiano (al punto X0) ---
-    % Attivala passando options.check_derivatives = true.
-    % Atteso: checkgradient slope ~2, checkhessian slope ~3 e simmetria ~1e-12.
+    % --- check gradient e hessian
     if isfield(options, 'check_derivatives') && options.check_derivatives
         fprintf('--- checkgradient (slope atteso ~2) ---\n');
         checkgradient(problem, X0);
@@ -654,21 +559,17 @@ end
         drawnow;
     end
 
-    % --- Modalita' "solo gradiente": salta l'ottimizzazione --------------
-    % Con options.grad_only = true non si ottimizza: Xtr = X0 e a valle si
-    % calcola solo il gradiente riemanniano in X0 (per controlli esterni).
+    % --- Modalita' "solo gradiente": salta l'ottimizzazione for debug
     if isfield(options, 'grad_only') && options.grad_only
         Xtr = X0;
     else
-        % [CACHE] limita la profondita' dello storedb di Manopt: ogni store
-        % puo' contenere KRU (grande, fino a ~GB); al trust-region bastano
-        % pochi punti vivi. Override con options.storedepth.
+        %
         if ~isfield(options, 'storedepth') || isempty(options.storedepth)
             options.storedepth = 3;
         end
 
-        % --- Scelta del solver: default trust-regions (usa l'Hessiano) ---
-        % Override con options.solver = 'conjugategradient' | 'steepestdescent'.
+        % Solver: defualt trustregions---
+        % Or con options.solver = 'conjugategradient' | 'steepestdescent'.
         if isfield(options, 'solver') && ~isempty(options.solver)
             solver = lower(options.solver);
         else
@@ -702,8 +603,7 @@ end
     fprintf('||rgrad f(Xtr)|| = %e\n', norm_rg);
     fprintf('riduzione: %e\n', norm_rg / norm_rg0);
 
-    % Output opzionali: punto iniziale, gradiente riemanniano in X0 e sua norma
-    % (utili per controlli esterni; X0 e' il punto esteso via cheb_approx).
+    % additional output
     X0_out      = X0;
     rg0_out     = rg_init;
     norm_rg0_out = norm_rg0;
