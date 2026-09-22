@@ -8,8 +8,7 @@ function Script_case2_compare_reliability_seed50(cfg)
 %   Writes case2_compare_reliability_seed50_d567_ne<ne>.mat.
 
 here = fileparts(mfilename('fullpath'));
-% Le funzioni condivise stanno in <repo>/src, messe sul path da setup_paths.m
-%  (gli script vivono in <repo>/experiments/<esperimento>/).
+%
 repoRoot = fileparts(fileparts(here));
 run(fullfile(repoRoot, 'setup_paths.m'));
 if ~exist('chebpts','file'),      error('chebpts not found: add MarkovCrossApproximation to the path.'); end
@@ -19,7 +18,7 @@ if ~exist('trustregions','file'), error('Manopt is required on the path.'); end
 if nargin < 1, cfg = struct(); end
 g = @(f,v) getdef(cfg,f,v);
 
-%% ---- CONFIG --------------------------------------------------------------
+%% ---- CONFIG
 d_list       = g('d_list', [5 6 7]);
 seed_list    = g('seed_list', 1:50);
 ne           = g('ne', 20);                % fasi Erlang: 20, 30 o 40
@@ -53,7 +52,7 @@ outlier_factor   = g('outlier_factor', 10);
 make_figures     = g('make_figures', true);
 figprefix        = g('figprefix', sprintf('case2_seed50_ne%d', ne));
 
-% coerenza griglie multilivello con la griglia finale comune
+% grids
 if nt_levels(1) ~= rank_time, error('nt_levels(1) deve = rank_time'); end
 if np_levels(1) ~= rank_par,  error('np_levels(1) deve = rank_par'); end
 if nt_levels(end) ~= Nt, error('nt_levels(end) deve = Nt (%d)', Nt); end
@@ -61,9 +60,7 @@ if np_levels(end) ~= Np, error('np_levels(end) deve = Np (%d)', Np); end
 if numel(coeff_levels) ~= numel(nt_levels) || numel(np_levels) ~= numel(nt_levels)
     error('nt_levels, np_levels and coeff_levels must have the same length');
 end
-% Dal livello 2 in poi la griglia e' [nt_levels(lev), np_levels(lev)*ones]:
-% i ranghi del core devono starci dentro, altrimenti il solver esplode con un
-% errore di dimensioni incomprensibile dentro Manopt.
+% 
 if numel(nt_levels) > 1
     if rank_time > min(nt_levels(2:end))
         error('rank_time = %d > min(nt_levels(2:end)) = %d', rank_time, min(nt_levels(2:end)));
@@ -73,7 +70,7 @@ if numel(nt_levels) > 1
     end
 end
 
-%% ---- Modello (IPS, Fig. 4), misura eq11 ----------------------------------
+%% ---- Modello (IPS)
 nstates = 3 + 2*ne;
 tf  = 24*365*10;
 pi0 = zeros(nstates,1); pi0(1)=1;
@@ -86,7 +83,7 @@ allpar_eq10 = { [1, 3],       [1e-4, 1e-3], [1e-5, 1e-4], [1e-5, 1e-4], ...
 par_order = g('par_order', [3 4 5 7 8 9 10 11 12 6 1 2]);
 allpar    = allpar_eq10(par_order);
 
-% scope condiviso con la nested Afiber
+% 
 grids = {}; n = []; p = 0; d = 0; Qh = [];
 aca_nft = 0;                     % contatore entrate osservate da ACA
 
@@ -95,12 +92,11 @@ aca_rk  = nan(nseed, nd);  aca_err = nan(nseed, nd);  aca_t = nan(nseed, nd);
 aca_cap = false(nseed, nd);
 che_err = nan(nseed, nd);  che_t = nan(nseed, nd);
 done    = false(nseed, nd);
-% entrate osservate: per ACA variano col seme (rango adattivo), per Cheb sono
-% deterministiche dalla configurazione, quindi basta un valore per d.
+%
 aca_obs = nan(nseed, nd);  che_obs = nan(1, nd);
 time_outliers = false(nseed, nd);
 
-%% ---- resume --------------------------------------------------------------
+%% 
 if resume && isfile(outfile)
     S = load(outfile);
     okcfg = isequal(S.d_list(:).', d_list(:).') && ...
@@ -159,7 +155,7 @@ for id = 1:nd
         continue
     end
 
-    % test set FISSO (una volta per d)
+    % test set
     t_ts = tic;
     rng(sample_seed);
     subs = zeros(nsamples, d); subs(:,1) = randi(Nt, nsamples, 1);
@@ -183,9 +179,7 @@ for id = 1:nd
         opt(jl).hessian='gn'; opt(jl).verbosity=0;
     end
 
-    % entrate osservate da Cheb: deterministiche dalla configurazione, quindi
-    % le calcoliamo qui invece di strumentare cheb_riemm_sparse_mixed, che e'
-    % condiviso con molti altri script.
+    % 
     che_obs(id) = cheb_observed_entries(core_dims, nt_levels, np_levels, coeff_levels, d);
     appendlog(logfile, sprintf(['  entries observed by Cheb (deterministic): ' ...
         '%.3e out of %.3e total (%.2e%%)'], che_obs(id), Nt*Np^p, 100*che_obs(id)/(Nt*Np^p)));
@@ -194,7 +188,7 @@ for id = 1:nd
         if done(is,id), continue; end
         s = seed_list(is);
 
-        % ----- ACA con seme s -----
+        % ----- ACA s -----
         rng(s);
         aca_nft = 0;
         t0 = tic; U = {};
@@ -207,7 +201,7 @@ for id = 1:nd
         aca_err(is,id) = norm(sum(Vv,2) - vals_true) / ntrue;
         aca_cap(is,id) = (rk >= aca_maxit);
 
-        % ----- Cheb con seme s -----
+        % ----- Cheb s -----
         if do_cheb
             rng(s);
             t0 = tic; Xf = [];
@@ -219,7 +213,7 @@ for id = 1:nd
 
         done(is,id) = true;
 
-        % ---- salvataggio INCREMENTALE (dopo ogni seme) --------------------
+        % ---- save
         save_partial();
 
         if do_cheb
@@ -251,7 +245,7 @@ for id = 1:nd
     end
 end
 
-%% ---- outlier di tempo ----------------------------------------------------
+%% ---- outlier
 time_outliers = flag_time_outliers(che_t, aca_t, done, outlier_factor);
 if any(time_outliers(:))
     [ri,ci] = find(time_outliers);
@@ -267,7 +261,7 @@ else
 end
 save_partial();
 
-%% ---- riepilogo -----------------------------------------------------------
+%% ---- recap
 appendlog(logfile, sprintf('========== RIEPILOGO ne=%d (%d semi) ==========', ne, nseed));
 appendlog(logfile, sprintf('%3s | %10s %9s %6s | %10s %9s %8s %6s', ...
     'd','Cheb L2','Cheb dof','t med','ACA L2','ACA dof','rk range','t med'));
@@ -284,7 +278,7 @@ appendlog(logfile, '(* = ACA hit the maxit=1000 cap -> NO convergence)');
 appendlog(logfile, sprintf('tempo totale: %.0f s (%.2f h)', toc(t_run), toc(t_run)/3600));
 appendlog(logfile, 'DONE');
 
-%% ---- figure diagnostiche -------------------------------------------------
+%% ---- figure
 if make_figures && do_cheb
     col_cr  = [0 0.45 0.74];
     col_aca = [0.85 0.33 0.10];
@@ -343,7 +337,7 @@ fprintf('\nSalvati risultati in %s\n', outfile);
     end
 end
 
-%% ===== locali =============================================================
+%% ===== local
 function v = getdef(cfg,f,default), if isfield(cfg,f), v=cfg.(f); else, v=default; end, end
 function s = tern(c,a,b), if c, s=a; else, s=b; end, end
 
@@ -356,11 +350,6 @@ function appendlog(f,msg)
     fprintf('%s\n', msg);
 end
 
-% Entrate del tensore osservate dal completamento multilivello. Replica la
-% logica di cheb_riemm_sparse_mixed (righe ~52-70): al livello base si prende
-% l'intera griglia a forma di core, ai livelli successivi si scelgono
-% nfibers = ceil(nr / n1) fibre con nr = coeff*(sum(core.*dims) + prod(core)),
-% saturato al numero massimo di fibre disponibili.
 function tot = cheb_observed_entries(core_dims, nt_levels, np_levels, coeff_levels, d)
     tot = prod(core_dims);                       % livello 1: base_level = true
     for lev = 2:numel(nt_levels)
@@ -372,8 +361,7 @@ function tot = cheb_observed_entries(core_dims, nt_levels, np_levels, coeff_leve
     end
 end
 
-% Celle il cui tempo (Cheb o ACA) supera factor volte la mediana della propria
-% colonna: tipicamente standby del sistema o carico esterno, non calcolo vero.
+
 function bad = flag_time_outliers(che_t, aca_t, done, factor)
     bad = false(size(done));
     for c = 1:size(done,2)
