@@ -99,7 +99,7 @@ fclose(fid);
 fprintf('Written %s (%d values of d, %d seeds).\n', texfile, np, S.nseeds);
 end
 
-%% ---- Tukey statistics in log10 scale ------------------------------------
+%% ---- Tukey statistics in log10 scale
 function [lw, q1, med, q3, uw, outliers] = box_stats_log(x)
     l    = log10(x(:));
     q1l  = prctile(l, 25);
