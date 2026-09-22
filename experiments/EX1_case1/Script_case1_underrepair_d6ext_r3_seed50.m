@@ -40,10 +40,7 @@ end
 if numel(core_dims) ~= d
     error('core_dims deve avere %d elementi (d = %d)', d, d);
 end
-% Dal livello 2 in poi run_ml costruisce la griglia td = ncheb(lev)*ones(1,d):
-% ogni rango del core deve starci dentro, altrimenti il fattore di modo e'
-% rettangolare "al contrario" e il solver esplode con un errore di dimensioni
-% incomprensibile dentro Manopt. Meglio fermarsi subito con un messaggio utile.
+% 
 if numel(ncheb) > 1 && any(core_dims > min(ncheb(2:end)))
     error(['core_dims = [%s] is not compatible with ncheb = [%s]: from ' ...
            'level 2 on the grid has min(ncheb(2:end)) = %d points per ' ...
@@ -51,16 +48,14 @@ if numel(ncheb) > 1 && any(core_dims > min(ncheb(2:end)))
            num2str(core_dims), num2str(ncheb), min(ncheb(2:end)), min(ncheb(2:end)));
 end
 
-%% ---- Path ----------------------------------------------------------------
-% Le funzioni condivise stanno in <repo>/src, messe sul path da setup_paths.m
-%  (gli script vivono in <repo>/experiments/<esperimento>/).
+%% ---- Path
 repoRoot = fileparts(fileparts(scriptDir));
 run(fullfile(repoRoot, 'setup_paths.m'));
 if ~exist('chebpts','file'),      error('chebpts not found: add MarkovCrossApproximation to the path.'); end
 if ~exist('tenrand','file'),      error('Tensor Toolbox is required on the path.'); end
 if ~exist('trustregions','file'), error('Manopt is required on the path.'); end
 
-%% ---- Modello (Case study 1 ESTESO, nr = 3), misura Repair ----------------
+%% ---- (Case study 1 ESTESO, nr = 3) Repair
 nreplicas = 3; nstates = nreplicas + 2;   % nr=3 (estensione attiva)
 tf = 24*365*10;
 pi0 = zeros(nstates,1); pi0(1)=1;
@@ -70,7 +65,7 @@ lam2_fix = 1e-7; c1_fix = 0.95; c2_fix = 0.80;
 Qh = @(la,cf,cr,mud,mu) evalQ_extended(nreplicas, la, lam2_fix, mu, mud, cf, c2_fix, c1_fix, cr);
 param_iv = { [1e-6,1e-5], [0.90,0.99], [0.90,0.99], [0.25,0.75], [0.25,0.75] };
 
-tmap = @(s) s;                            % tempo FISICO (nessun log-mapping)
+tmap = @(s) s;                            % time
 N = ncheb(end);
 p = d-1;
 if numel(param_iv) < p
@@ -78,13 +73,13 @@ if numel(param_iv) < p
 end
 intervals = [ {[0, tf]}, param_iv(1:p) ];
 
-% normalizzazione della misura al punto medio dello spazio dei parametri
+% 
 midc = num2cell(cellfun(@(iv)0.5*(iv(1)+iv(2)), param_iv(1:p)));
 Q0 = Qh(midc{:});
 s0 = max(abs(ur(tmap(chebpts(N,[0,tf])), Q0, pi0, en)));
 fun = @(s,Q,p0,e) ur(tmap(s),Q,p0,e)/s0;
 
-%% ---- risultati + resume --------------------------------------------------
+%% ---- results ------
 ns_seed = numel(seed_list);
 err_cheb = nan(ns_seed,1);  tim_cheb = nan(ns_seed,1);
 err_aca  = nan(ns_seed,1);  tim_aca  = nan(ns_seed,1);  k_aca = nan(ns_seed,1);
@@ -115,10 +110,8 @@ if resume
     appendlog(logfile, sprintf('RESUME: %d/%d semi gia'' fatti.', nnz(done), ns_seed));
 end
 
-%% ---- test set FISSO (una volta sola) -------------------------------------
+%% ---- test set -----------
 t_ts = tic;
-% NB: la cella si chiama 'grd', non 'grid', per non oscurare la funzione
-% grid() usata nel blocco delle figure piu' sotto.
 grd = cell(1,d); for i=1:d, grd{i}=chebpts(N,intervals{i}); end
 rng(sample_seed);
 subs = zeros(nsamples,d); for j=1:d, subs(:,j)=randi(N,nsamples,1); end
@@ -132,7 +125,7 @@ Af = @(j,i) fib_od(j,i,grd,pi0,en,fun,Qh);
 appendlog(logfile, sprintf(['d=%d ESTESO r3 nr=%d  test set FISSO pronto ' ...
     '(nvt=%.3e, %.1f s).'], d, nreplicas, nvt, toc(t_ts)));
 
-%% ---- opzioni ottimizzazione (fisse) --------------------------------------
+%% ---- options 
 clear opt
 for j=1:numel(ncheb)
     opt(j).maxiter=maxiter; opt(j).maxinner=maxinner; opt(j).tolgradnorm=tolgradnorm;
@@ -140,13 +133,13 @@ for j=1:numel(ncheb)
     opt(j).solver='trustregions'; opt(j).hessian='gn'; opt(j).storedepth=storedepth;
 end
 
-%% ---- loop sui semi (ORDINE: prima ACA, poi Cheb) -------------------------
+%% ---- loop ( ACA, poi Cheb)
 t_run = tic;
 for is = 1:ns_seed
     if done(is), continue; end
     s = seed_list(is);
 
-    % (A) ACA con seme s (pivot casuali al check di convergenza)
+    % ACA s 
     rng(s);
     ta=tic;
     U={};
@@ -155,7 +148,7 @@ for is = 1:ns_seed
     k_aca(is)   = size(U{1},2);
     err_aca(is) = aca_eval(U, subs, k_aca(is), vt, nvt);
 
-    % (B) Cheb con seme s (selezione casuale delle fibre)
+    % Cheb s
     rng(s);
     t0=tic;
     Xu=[];
@@ -166,7 +159,7 @@ for is = 1:ns_seed
 
     done(is) = true;
 
-    % ---- salvataggio INCREMENTALE (dopo ogni seme) ------------------------
+    % ---- saving
     save(outfile, 'seed_list','err_cheb','tim_cheb','err_aca','tim_aca','k_aca', ...
         'done','core_dims','ncheb','coeff_levels','nreplicas','d','nsamples', ...
         'aca_tol','sample_seed');
@@ -177,7 +170,7 @@ for is = 1:ns_seed
         eta_str(done, tim_cheb, tim_aca, t_run)));
 end
 
-%% ---- riepilogo -----------------------------------------------------------
+%% results
 dof_cheb = prod(core_dims) + sum(N*core_dims);        % Tucker
 dof_aca  = @(rk) rk * N * d;                          % CP: rk * sum_i N_i
 appendlog(logfile, sprintf(['SUMMARY Cheb (%d seeds): median=%.3e  min=%.3e  ' ...
@@ -193,12 +186,12 @@ appendlog(logfile, sprintf(['SUMMARY ACA  (%d seeds): median err=%.3e  min=%.3e 
 appendlog(logfile, sprintf('tempo totale: %.0f s (%.2f h)', toc(t_run), toc(t_run)/3600));
 appendlog(logfile, 'DONE');
 
-%% ---- Figure --------------------------------------------------------------
+%
 if make_figures
     col_cr  = [0 0.45 0.74];      % blu     = Cheb+Riemann
     col_aca = [0.85 0.33 0.10];   % arancio = ACA
 
-    % (1) errore L2: le due distribuzioni affiancate
+    % error L2
     f1 = figure('Visible','off','Position',[100 100 620 500]);
     hold on
     draw_box(1, err_cheb, col_cr);
@@ -210,7 +203,7 @@ if make_figures
     title(sprintf('Case study 1 under repair, d = %d : %d semi', d, nnz(done)));
     saveas(f1, fullfile(scriptDir, [figprefix '_err_boxes.png']));
 
-    % (2) gradi di liberta': Cheb fisso per costruzione vs nuvola ACA
+    %  DOF
     f2 = figure('Visible','off','Position',[100 100 620 500]);
     hold on
     draw_box(1, dof_cheb*ones(nnz(done),1), col_cr);
@@ -228,7 +221,7 @@ end
 fprintf('\nSalvati risultati in %s\n', outfile);
 end
 
-%% ===== locali =============================================================
+%% ===== local functions
 function v = getdef(cfg, f, default)
     if isfield(cfg, f), v = cfg.(f); else, v = default; end
 end
@@ -242,7 +235,7 @@ function appendlog(f,msg)
     fprintf('%s\n', msg);
 end
 
-% Stima del tempo residuo dal costo medio per seme gia' osservato.
+% Time
 function s = eta_str(done, tim_cheb, tim_aca, t_run)
     per = mean(tim_cheb + tim_aca, 'omitnan');
     if isnan(per), s = ''; return; end
@@ -292,8 +285,6 @@ function v=ur(tvec,Q,pi0,en)
 end
 
 function draw_box(x, data, col)
-    % box "fatto a mano" (quartili + mediana) piu' nuvola dei punti, senza
-    % dipendere dallo Statistics Toolbox.
     data = data(~isnan(data));
     if isempty(data), return; end
     q = quantile(data, [0.25 0.5 0.75]);
