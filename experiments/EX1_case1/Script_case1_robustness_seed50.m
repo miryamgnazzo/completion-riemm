@@ -42,16 +42,14 @@ end
 
 N = ncheb(end);
 
-%% ---- Path ----------------------------------------------------------------
-% Le funzioni condivise stanno in <repo>/src, messe sul path da setup_paths.m
-%  (gli script vivono in <repo>/experiments/<esperimento>/).
+%
 repoRoot = fileparts(fileparts(scriptDir));
 run(fullfile(repoRoot, 'setup_paths.m'));
 if ~exist('chebpts','file'),      error('chebpts not found: add MarkovCrossApproximation to the path.'); end
 if ~exist('tenrand','file'),      error('Tensor Toolbox is required on the path.'); end
 if ~exist('trustregions','file'), error('Manopt is required on the path.'); end
 
-%% ---- Modello CONDIVISO (Case study 1c, nr = 2) ---------------------------
+%% ---- (Case study 1c, nr = 2) ---------------------------
 nreplicas = 2;
 nstates   = nreplicas + 2;
 tf = 24*365*10;
@@ -63,7 +61,7 @@ param_intervals = {[1e-6,1e-5],[0.9,0.99],[0.9,0.99],[0.25,0.75],[0.25,0.75]};
 
 np = numel(p_list);
 
-% risultati: righe = seme, colonne = p
+% ---- results
 cr_L2   = nan(nseeds, np);   cr_Linf = nan(nseeds, np);
 cr_rank = nan(nseeds, np);   cr_time = nan(nseeds, np);
 aca_L2   = nan(nseeds, np);  aca_Linf = nan(nseeds, np);
@@ -71,7 +69,7 @@ aca_rank = nan(nseeds, np);  aca_time = nan(nseeds, np);
 aca_calls = nan(nseeds, np);
 done = false(nseeds, np);
 
-% ---- resume ---------------------------------------------------------------
+% ---- 
 if resume && isfile(outfile)
     S = load(outfile);
     okcfg = isequal(S.p_list(:).', p_list(:).') && S.nseeds == nseeds && ...
@@ -112,7 +110,7 @@ for ip = 1:np
     grids = cell(1, d);
     for j = 1:d, grids{j} = chebpts(N, intervals_user{j}); end
 
-    % ---- TEST SET condiviso e FISSO --------------------------------------
+    % ---- TEST SET
     t_ts = tic;
     rng(sample_seed);
     subs = zeros(nsamples, d);
@@ -144,7 +142,7 @@ for ip = 1:np
     for s = 1:nseeds
         if done(s, ip), continue; end
 
-        % ---- (A) Cheb + Riemann con seme s -------------------------------
+        % ---- Cheb + Riemann s -------------------------------
         rng(s);
         Xuser = [];
         t0 = tic;
@@ -156,7 +154,7 @@ for ip = 1:np
         cr_Linf(s, ip) = max(abs(vals_cr - vals_true));
         cr_rank(s, ip) = core_rank;             % fisso per costruzione
 
-        % ---- (B) ACA con seme s ------------------------------------------
+        % ---- ACA s ------------------------------------------
         rng(s);
         nft = 0;
         U = {};
@@ -171,7 +169,7 @@ for ip = 1:np
 
         done(s, ip) = true;
 
-        % ---- salvataggio INCREMENTALE (dopo ogni seme) -------------------
+        % 
         save(outfile, 'p_list','nseeds','aca_tol','core_rank','ncheb', ...
              'coeff_levels','nsamples','sample_seed','done', ...
              'cr_L2','cr_Linf','cr_rank','cr_time', ...
@@ -190,7 +188,7 @@ for ip = 1:np
         min(aca_rank(:,ip)),  max(aca_rank(:,ip))));
 end
 
-%% ---- Tabella riassuntiva (spread = dispersione sui semi) -----------------
+%
 appendlog(logfile, sprintf('============ ROBUSTEZZA SIMMETRICA (%d semi) ============', nseeds));
 appendlog(logfile, sprintf('%3s | %3s | %10s %10s %5s | %10s %10s %7s', ...
         'p','d','L2 med','spread','rank','L2 med','spread','rk max'));
@@ -204,13 +202,13 @@ end
 appendlog(logfile, sprintf('tempo totale: %.0f s (%.2f h)', toc(t_run), toc(t_run)/3600));
 appendlog(logfile, 'DONE');
 
-%% ---- Figure --------------------------------------------------------------
+%% ---- Figure --
 if make_figures
     xp = p_list;
     col_cr  = [0 0.45 0.74];      % blu  = Cheb+Riemann
     col_aca = [0.85 0.33 0.10];   % arancio = ACA
 
-    % (1) errore L2 vs p: DUE nuvole (una per metodo) con mediana
+    % error L2
     f1 = figure('Visible','off','Position',[100 100 760 500]);
     hold on
     for ip = 1:np
@@ -230,7 +228,7 @@ if make_figures
     xticks(xp);
     saveas(f1, fullfile(scriptDir, [figprefix '_error_vs_p.png']));
 
-    % (2) box affiancati a p = max: le due distribuzioni fianco a fianco
+    % box
     ipmax = np;
     f2 = figure('Visible','off','Position',[100 100 620 500]);
     hold on
@@ -243,7 +241,7 @@ if make_figures
     title(sprintf('p = %d : side-by-side distributions (%d seeds)', p_list(ipmax), nseeds));
     saveas(f2, fullfile(scriptDir, [figprefix '_boxes.png']));
 
-    % (3) rango vs p: Cheb fisso (per costruzione) vs nuvola ACA
+    % rank
     f3 = figure('Visible','off','Position',[100 100 760 500]);
     hold on
     for ip = 1:np
@@ -266,7 +264,7 @@ end
 
 fprintf('\nSalvati risultati in %s\n', outfile);
 
-%% ===== funzione annidata (condivide grids/nft/pi0/r) =====================
+%% -----additional functions
     function f = Afiber_counted(j, i)
         dloc = numel(grids);
         prm = cell(1, dloc-1);
@@ -287,7 +285,7 @@ fprintf('\nSalvati risultati in %s\n', outfile);
     end
 end
 
-%% ===== funzioni locali ====================================================
+%% ----local function
 function v = getdef(cfg, f, default)
     if isfield(cfg, f), v = cfg.(f); else, v = default; end
 end
@@ -301,8 +299,7 @@ function appendlog(f, msg)
     fprintf('%s\n', msg);
 end
 
-% Stima del tempo residuo: usa il costo medio per seme gia' osservato in
-% ciascuna colonna p; per le colonne non ancora iniziate usa l'ultima nota.
+% Time estimate
 function s = eta_str(done, cr_time, aca_time, t_run)
     per = mean(cr_time + aca_time, 1, 'omitnan');    % s/seme per ogni p
     lastk = find(~isnan(per), 1, 'last');
