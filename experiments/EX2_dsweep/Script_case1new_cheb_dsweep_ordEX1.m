@@ -10,15 +10,13 @@ if nargin < 1, cfg = struct(); end
 g = @(f,v) getdef(cfg,f,v);
 
 here = fileparts(mfilename('fullpath'));
-% Le funzioni condivise stanno in <repo>/src, messe sul path da setup_paths.m
-%  (gli script vivono in <repo>/experiments/<esperimento>/).
 repoRoot = fileparts(fileparts(here));
 run(fullfile(repoRoot, 'setup_paths.m'));
 if ~exist('chebpts','file'),      error('chebpts not found: add MarkovCrossApproximation to the path.'); end
 if ~exist('tenrand','file'),      error('Tensor Toolbox is required on the path.'); end
 if ~exist('trustregions','file'), error('Manopt is required on the path.'); end
 
-%% ---- CONFIG --------------------------------------------------------------
+%% ---- CONFIGuration
 d_list       = g('d_list', [6 7 8 9]);
 ncheb        = g('ncheb', [3 16 32 64 128 256]);
 coeff_levels = g('coeff_levels', [1 5 10 30 50 80]);
@@ -33,12 +31,11 @@ run_seed     = g('run_seed', 1);
 sample_seed  = g('sample_seed', 0);
 resume       = g('resume', true);
 
-% ordine di attivazione = tab:case1_parameters (par_2..par_9)
+% order = tab:case1_parameters (par_2..par_9)
 par_order  = g('par_order', [1 5 8 4 3 2 7 6]);
 allpar_tab = g('allpar_tab', { [1e-8,1e-5], [0.9,0.99], [0.9,0.99], [0.25,0.75], ...
                                [0.25,0.75], [1e-7,1e-6], [0.95,0.995], [0.8,0.95] });
-% NB: par_2 = lambda ha l'intervallo ALLARGATO a [1e-8,1e-5], come dichiarato
-% nel testo ("we widen the interval chosen for parameter par_2").
+%
 
 outfile = g('outfile', 'case1new_cheb_dsweep_ordEX1_results.mat');
 logfile = g('logfile', 'case1new_cheb_dsweep_ordEX1_progress.txt');
@@ -56,7 +53,7 @@ end
 if resume && isfile(outfile), lmode = 'a'; else, lmode = 'w'; end
 fid=fopen(logfile,lmode); fprintf(fid,'start %s\n', datestr(now)); fclose(fid);
 
-%% ---- Modello CONDIVISO (Case study 1 completo, nr = 5) -------------------
+%% ---- (Case study 1 completo, nr = 5) -------------------
 nreplicas = 5;
 nstates   = nreplicas + 2;             % = 7
 tf = 24*365*10;
@@ -105,7 +102,7 @@ for id = 1:nd
         error('d=%d out of range: 5..8 free parameters required (d=6..9).', d);
     end
 
-    % liberi = primi p nell'ordine di TABELLA; fissi = i restanti al bordo inf.
+    %
     intervals_user = [ {[0, tf]}, allpar_tab(1:p) ];
     fixv = cellfun(@(x) x(1), allpar_tab(p+1:end));
     fixc = num2cell(fixv);
@@ -166,7 +163,7 @@ for id = 1:nd
         d, time_cr(id), err_L2(id), err_Linf(id)));
 end
 
-%% ---- riepilogo (formato di tab:cheb_dsweep) ------------------------------
+%% ---- results ------------------------------
 appendlog(logfile, '======== tab:cheb_dsweep ========');
 appendlog(logfile, sprintf('%3s | %10s | %11s | %11s | %8s | %10s', ...
     'd','Accuracy','Observed','Total','Time (s)','Observed %'));
@@ -179,7 +176,7 @@ appendlog(logfile, 'DONE');
 fprintf('\nSalvati risultati in %s\n', outfile);
 end
 
-%% ===== funzioni locali ====================================================
+%% ===== local functions
 function v = getdef(cfg, f, default)
     if isfield(cfg, f), v = cfg.(f); else, v = default; end
 end
@@ -193,8 +190,7 @@ function appendlog(f,msg)
     fprintf('%s\n', msg);
 end
 
-% Rimette i valori (in ordine di ATTIVAZIONE) nelle posizioni degli argomenti
-% di evalQ_extended(nr, lambda, lambda2, mu, mu_d, cf, c2, c1, cr).
+%eval Q right order
 function Q = evalQ_perm(nr, par_order, varargin)
     vals = [varargin{:}];
     v = zeros(1, 8); v(par_order) = vals;
@@ -218,7 +214,7 @@ function [tot, last, per_lev] = observed_entries(core_dims, ncheb, coeff_levels,
     last = per_lev(end);
 end
 
-% nomi nell'ordine di tab:case1_parameters (par_2..par_9)
+%
 function nm = tabnames(k)
     all = {'lambda','cf','cr','mu_d','mu','lambda2','c1','c2'};
     nm = all(k);
