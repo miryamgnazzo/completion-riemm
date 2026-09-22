@@ -142,7 +142,7 @@ for ip = 1:np
     for s = 1:nseeds
         if done(s, ip), continue; end
 
-        % ---- Cheb + Riemann s -------------------------------
+        % ---- Cheb + Riemann s 
         rng(s);
         Xuser = [];
         t0 = tic;
@@ -154,7 +154,7 @@ for ip = 1:np
         cr_Linf(s, ip) = max(abs(vals_cr - vals_true));
         cr_rank(s, ip) = core_rank;             % fisso per costruzione
 
-        % ---- ACA s ------------------------------------------
+        % ---- ACA s
         rng(s);
         nft = 0;
         U = {};
@@ -330,8 +330,6 @@ function vals = eval_cp(U, subs)
 end
 
 function draw_box(x, data, col)
-    % box "fatto a mano" (quartili + mediana) piu' nuvola dei punti, senza
-    % dipendere dallo Statistics Toolbox.
     data = data(~isnan(data));
     q = quantile(data, [0.25 0.5 0.75]);
     n = numel(data);
