@@ -1,11 +1,6 @@
 %% gen_boxplot_tex_50
 % Build the pgfplots box-plot fragments for Case study 2 from the stored
-% .mat files (d = 5,6,7 by ne = 20,30,40). Statistics are quartiles and
-% Tukey whiskers computed on the raw data; log10 is applied only to the
-% plotted values.
-%
-% Output: dof_plots.tex, time_plots.tex, dof_plots_log.tex,
-% time_plots_log.tex, summary_stats.txt
+% .mat files (d = 5,6,7 by ne = 20,30,40). 
 
 here = fileparts(mfilename('fullpath'));
 d_want  = [5 6 7];
@@ -48,7 +43,7 @@ emit(fullfile(here,'time_plots.tex'),     G, 't_c',   't_a',   'raw');
 emit(fullfile(here,'dof_plots_log.tex'),  G, 'dof_c', 'dof_a', 'log');
 emit(fullfile(here,'time_plots_log.tex'), G, 't_c',   't_a',   'log');
 
-% ---- riepilogo + estremi per gli assi --------------------------------------
+% ---- recap
 fid = fopen(fullfile(here,'summary_stats.txt'),'w');
 fprintf(fid,'Nt=%d Np=%d rank_time=%d rank_par=%d (%d seeds)\n\n', Nt,Np,rt,rp,nseed);
 fprintf(fid,'%-9s | %8s | %-22s | %8s | %-22s\n','group','dofCheb', ...
@@ -61,7 +56,7 @@ end
 fclose(fid);
 type(fullfile(here,'summary_stats.txt'));
 
-% actual plotted extremes (whiskers AND outliers), to set ymin/ymax
+% actual plotted extremes
 fprintf('\n=== log10 EXTREMES TO BE PLOTTED (for ymin/ymax) ===\n');
 for pair = {{'dof_c','dof_a','DoF'}, {'t_c','t_a','Time'}}
     fc = pair{1}{1}; fa = pair{1}{2}; nm = pair{1}{3};
@@ -77,7 +72,7 @@ for pair = {{'dof_c','dof_a','DoF'}, {'t_c','t_a','Time'}}
         nm, lo, hi, 10^lo, 10^hi, lo-0.08, hi+0.08);
 end
 
-%% ===== local functions =====================================================
+%% ===== local functions
 function emit(fname, G, fc, fa, mode)
     uselog = strcmpi(mode, 'log');
     if uselog, tr = @(v) log10(v); else, tr = @(v) v; end
